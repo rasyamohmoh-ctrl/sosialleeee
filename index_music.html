@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>TIA • Love Adventure</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&display=swap');
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--pink:#ff4f9a;--purple:#7c5cff;--cyan:#39e7ff}
+html,body{width:100%;height:100%;overflow:hidden;background:#080817;font-family:Outfit,Arial,sans-serif}
+body{display:flex;align-items:center;justify-content:center}
+#gameWrap{position:relative;width:100vw;height:100vh;overflow:hidden}
+canvas{width:100%;height:100%;display:block}
+#topbar{position:absolute;top:16px;left:16px;right:16px;display:flex;align-items:center;justify-content:space-between;z-index:5;pointer-events:none}
+.logo{display:flex;align-items:center;gap:10px;color:#fff;font-weight:800;font-size:19px;text-shadow:0 0 20px #ff4f9a}
+.logo span{width:40px;height:40px;display:grid;place-items:center;border-radius:14px;background:linear-gradient(135deg,var(--pink),var(--purple));box-shadow:0 8px 30px #ff4f9a55;font-size:22px}
+.stats{display:flex;gap:8px}
+.stat{min-width:90px;padding:8px 12px;border:1px solid #ffffff22;background:#101026cc;backdrop-filter:blur(12px);border-radius:14px;color:#fff;text-align:center}
+.stat small{display:block;color:#aaaac5;font-size:10px;text-transform:uppercase;letter-spacing:1px}
+.stat b{font-size:17px}
+#hint{position:absolute;top:72px;right:18px;color:#c0c0d4;font-size:12px;z-index:4}
+#controls{position:absolute;left:0;right:0;bottom:20px;display:flex;justify-content:space-between;padding:0 20px;z-index:8;pointer-events:none}
+.controlGroup{display:flex;gap:12px;pointer-events:auto}
+.ctrl{width:64px;height:64px;border-radius:21px;border:1px solid #ffffff28;background:#11112dcc;color:#fff;font-size:26px;font-weight:800;box-shadow:0 10px 35px #0008,inset 0 1px #fff2;backdrop-filter:blur(12px);touch-action:none;user-select:none}
+.ctrl:active{transform:scale(.92);background:#ff4f9a}
+.jump{width:76px;height:76px;border-radius:50%;background:linear-gradient(135deg,#ff4f9a,#7c5cff);box-shadow:0 10px 40px #ff4f9a66}
+#win{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:#050511bb;backdrop-filter:blur(10px);z-index:20}
+.card{width:min(92%,500px);padding:34px 26px;text-align:center;border:1px solid #ffffff22;border-radius:30px;background:linear-gradient(145deg,#18182fef,#0e0e20ef);box-shadow:0 30px 100px #000b;color:#fff}
+.heartBig{font-size:62px;filter:drop-shadow(0 0 25px #ff4f9a)}
+.card h1{font-size:34px;margin:8px 0}.card h1 span{color:var(--pink)}
+.card p{color:#bdbdd1;line-height:1.6;margin:10px 0 20px}
+.btn{border:0;padding:14px 24px;border-radius:16px;color:#fff;font:800 15px Outfit;background:linear-gradient(135deg,var(--pink),var(--purple));box-shadow:0 10px 30px #ff4f9a55;cursor:pointer}
+#photoInput{display:none}
+
+#musicBtn{
+  position:absolute;left:18px;bottom:18px;z-index:10;
+  border:1px solid #ffffff28;background:#101026dd;color:#fff;
+  padding:11px 15px;border-radius:15px;font:700 13px Outfit;
+  box-shadow:0 10px 30px #0007,0 0 20px #7c5cff33;
+  backdrop-filter:blur(12px);cursor:pointer;user-select:none;
+}
+#musicBtn.on{background:linear-gradient(135deg,#ff4f9a,#7c5cff)}
+
+@media(max-width:650px){
+.logo{font-size:14px}.logo span{width:34px;height:34px}
+.stat{min-width:64px;padding:7px 6px}.stat b{font-size:14px}
+#hint{display:none}.ctrl{width:58px;height:58px}.jump{width:70px;height:70px}
+}
+</style>
+</head>
+<body>
+<div id="gameWrap">
+<canvas id="game"></canvas>
+
+<div id="topbar">
+  <div class="logo"><span>♥</span>TIA LOVE ADVENTURE</div>
+  <div class="stats">
+    <div class="stat"><small>Hearts</small><b>❤️ <i id="hearts">0</i></b></div>
+    <div class="stat"><small>Score</small><b>⭐ <i id="score">0</i></b></div>
+    <div class="stat"><small>Progress</small><b id="progress">0%</b></div>
+  </div>
+</div>
+<div id="hint">A / D atau ← / → • SPACE untuk lompat</div>
+<button id="musicBtn">🎵 MUSIC OFF</button>
+
+<div id="controls">
+  <div class="controlGroup">
+    <button class="ctrl" id="left">‹</button>
+    <button class="ctrl" id="right">›</button>
+  </div>
+  <button class="ctrl jump" id="jump">↑</button>
+</div>
+
+<div id="win">
+  <div class="card">
+    <div class="heartBig">💗</div>
+    <h1>Untuk <span>Tia</span></h1>
+    <p id="result"></p>
+    <p>Di setiap level kehidupan, aku tetap memilih kamu. Terima kasih sudah menjadi bagian indah dari perjalanan ini. ❤️</p>
+    <button class="btn" id="again">MAIN LAGI ✨</button>
+  </div>
+</div>
+</div>
+
+<script>
+const canvas=document.getElementById('game');
+const ctx=canvas.getContext('2d');
+const wrap=document.getElementById('gameWrap');
+
+let W,H,dpr,camera=0,hearts=0,score=0,won=false;
+let shake=0;
+const WORLD=6200;
+const keys={l:false,r:false,j:false};
+
+function resize(){
+  dpr=Math.min(devicePixelRatio||1,2);
+  W=wrap.clientWidth; H=wrap.clientHeight;
+  canvas.width=W*dpr; canvas.height=H*dpr;
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+}
+addEventListener('resize',resize); resize();
+
+/* =========================================================
+   FOTO TIA
+   Cara memakai:
+   1. Tekan tombol "PILIH FOTO" yang muncul jika foto belum ada.
+   2. Pilih foto Tia dari komputer/HP.
+   3. Foto langsung menjadi karakter tanpa file tia.jpg.
+   ========================================================= */
+let photo=new Image();
+let photoReady=false;
+
+const savedPhoto=localStorage.getItem('tiaPhoto');
+if(savedPhoto){
+  photo.onload=()=>photoReady=true;
+  photo.src=savedPhoto;
+}
+
+function choosePhoto(){
+  const input=document.createElement('input');
+  input.type='file';
+  input.accept='image/*';
+  input.onchange=e=>{
+    const file=e.target.files[0];
+    if(!file)return;
+    const reader=new FileReader();
+    reader.onload=ev=>{
+      localStorage.setItem('tiaPhoto',ev.target.result);
+      photo.onload=()=>photoReady=true;
+      photo.src=ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  };
+  input.click();
+}
+
+/* Player */
+const p={x:100,y:300,w:62,h:82,vx:0,vy:0,on:false};
+
+/* Platforms */
+const platforms=[
+[0,520,920,100],[1040,465,610,70],[1760,525,700,95],[2580,450,620,70],
+[3330,525,840,95],[4300,465,700,70],[5130,525,1070,95],
+[470,390,180,22],[760,320,170,22],[1190,345,180,22],[1470,285,160,22],
+[1980,380,180,22],[2260,310,160,22],[2730,345,180,22],[3020,275,170,22],
+[3490,380,180,22],[3820,310,160,22],[4430,345,180,22],[4720,285,170,22],
+[5340,365,180,22],[5620,295,190,22]
+].map(a=>({x:a[0],y:a[1],w:a[2],h:a[3]}));
+
+/* Collectibles */
+const items=[
+[520,350,'heart'],[810,280,'star'],[1240,305,'heart'],[1510,245,'star'],
+[2010,340,'heart'],[2290,270,'star'],[2760,305,'heart'],[3050,235,'star'],
+[3520,340,'heart'],[3850,270,'star'],[4460,305,'heart'],[4750,245,'star'],
+[5370,325,'heart'],[5650,255,'star'],[5950,470,'heart']
+].map(a=>({x:a[0],y:a[1],type:a[2],got:false,bob:Math.random()*6}));
+
+/* Enemies */
+const enemies=[
+{x:890,y:478,w:40,h:42,v:1.1,min:820,max:980},
+{x:1590,y:423,w:40,h:42,v:-1.2,min:1510,max:1680},
+{x:2430,y:483,w:40,h:42,v:1.3,min:2350,max:2510},
+{x:4180,y:423,w:40,h:42,v:-1.2,min:4090,max:4250},
+{x:5010,y:423,w:40,h:42,v:1.2,min:4890,max:5080}
+];
+
+const stars=Array.from({length:100},()=>({
+ x:Math.random()*WORLD,y:35+Math.random()*270,r:Math.random()*2+.4,a:.3+Math.random()*.7
+}));
+const clouds=Array.from({length:18},(_,i)=>({
+ x:i*390+Math.random()*120,y:80+Math.random()*150,s:.7+Math.random()*.7
+}));
+
+let particles=[];
+function playSfx(type){
+  if(!audioCtx || !musicOn)return;
+  const now=audioCtx.currentTime;
+  if(type==='heart'){
+    tone(523.25,now,.12,'sine',.06);
+    tone(659.25,now+.08,.16,'sine',.05);
+    tone(783.99,now+.16,.20,'sine',.045);
+  }else if(type==='star'){
+    tone(659.25,now,.10,'triangle',.045);
+    tone(783.99,now+.09,.13,'triangle',.04);
+  }else if(type==='finish'){
+    tone(523.25,now,.18,'sine',.06);
+    tone(659.25,now+.15,.18,'sine',.06);
+    tone(783.99,now+.30,.22,'sine',.055);
+    tone(1046.50,now+.48,.45,'sine',.05);
+  }
+}
+
+function burst(x,y,type){
+  for(let i=0;i<18;i++){
+    const angle=Math.random()*Math.PI*2;
+    const speed=1+Math.random()*4;
+    particles.push({
+      x,y,
+      vx:Math.cos(angle)*speed,
+      vy:Math.sin(angle)*speed,
+      life:1,
+      type
+    });
+  }
+}
+
+function updateParticles(){
+  for(const q of particles){
+    q.x+=q.vx;q.y+=q.vy;q.vy+=.08;q.life-=.025;
+  }
+  particles=particles.filter(q=>q.life>0);
+}
+
+function drawParticles(){
+  for(const q of particles){
+    ctx.save();
+    ctx.globalAlpha=q.life;
+    ctx.font='18px Arial';
+    ctx.textAlign='center';
+    ctx.fillStyle=q.type==='heart'?'#ff4f9a':'#ffe45c';
+    ctx.fillText(q.type==='heart'?'♥':'★',q.x,q.y);
+    ctx.restore();
+  }
+}
+
+function hit(a,b){
+ return a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y;
+}
+
+function reset(){
+ p.x=100;p.y=300;p.vx=0;p.vy=0;
+ camera=0;hearts=0;score=0;won=false;
+ particles=[];
+ items.forEach(i=>i.got=false);
+ document.getElementById('win').style.display='none';
+}
+
+function update(){
+ if(won)return;
+
+ const dir=(keys.r?1:0)-(keys.l?1:0);
+ p.vx+=dir*.85;
+ p.vx*=dir?.88:.78;
+ p.vx=Math.max(-5.5,Math.min(5.5,p.vx));
+
+ if(keys.j&&p.on){
+   p.vy=-14;
+   p.on=false;
+   keys.j=false;
+ }
+
+ p.vy+=.65;
+ p.x+=p.vx;
+ p.y+=p.vy;
+ p.on=false;
+
+ for(const q of platforms){
+   if(p.x+p.w>q.x&&p.x<q.x+q.w&&
+      p.y+p.h>q.y&&p.y+p.h<q.y+26&&p.vy>=0){
+     p.y=q.y-p.h;
+     p.vy=0;
+     p.on=true;
+   }
+ }
+
+ p.x=Math.max(0,Math.min(WORLD-p.w,p.x));
+
+ if(p.y>H+250){
+   p.x=Math.max(100,p.x-200);
+   p.y=180;
+   p.vy=0;
+ }
+
+ for(const i of items){
+   if(!i.got && hit(p,{x:i.x-23,y:i.y-23,w:46,h:46})){
+     i.got=true;
+     if(i.type==='heart'){
+       hearts++;
+       score+=100;
+       burst(i.x,i.y,'heart');
+       playSfx('heart');
+     }else{
+       score+=50;
+       burst(i.x,i.y,'star');
+       playSfx('star');
+     }
+   }
+ }
+
+ for(const e of enemies){
+   e.x+=e.v;
+   if(e.x<e.min||e.x>e.max)e.v*=-1;
+
+   if(hit(p,e)){
+     if(p.vy>2&&p.y+p.h<e.y+18){
+       score+=100;
+       p.vy=-9;
+       e.x=e.min;
+       burst(e.x,e.y,'star');
+     }else{
+       p.x=Math.max(100,p.x-180);
+       p.y=180;
+       p.vy=0;
+       shake=10;
+     }
+   }
+ }
+
+ if(p.x>WORLD-220){
+   playSfx('finish');
+   won=true;
+   document.getElementById('result').textContent=
+   `Tia berhasil sampai finish! ❤️ ${hearts} hati • ⭐ ${score} poin`;
+   document.getElementById('win').style.display='flex';
+ }
+
+ camera+=(p.x-W*.35-camera)*.09;
+ camera=Math.max(0,Math.min(WORLD-W,camera));
+
+ updateParticles();
+
+ document.getElementById('hearts').textContent=hearts;
+ document.getElementById('score').textContent=score;
+ document.getElementById('progress').textContent=
+   Math.min(100,Math.round(p.x/(WORLD-220)*100))+'%';
+
+ if(shake>0)shake--;
+}
+
+function background(){
+ const g=ctx.createLinearGradient(0,0,0,H);
+ g.addColorStop(0,'#08081c');
+ g.addColorStop(.55,'#17134b');
+ g.addColorStop(1,'#32184d');
+ ctx.fillStyle=g;
+ ctx.fillRect(0,0,W,H);
+
+ ctx.save();
+ ctx.translate(-camera*.12,0);
+
+ for(const s of stars){
+   ctx.globalAlpha=s.a;
+   ctx.fillStyle='#fff';
+   ctx.beginPath();
+   ctx.arc(s.x,s.y,s.r,0,Math.PI*2);
+   ctx.fill();
+ }
+ ctx.globalAlpha=1;
+
+ ctx.shadowBlur=35;
+ ctx.shadowColor='#ff6db7';
+ ctx.fillStyle='#ffd8ec';
+ ctx.beginPath();
+ ctx.arc(520,130,55,0,Math.PI*2);
+ ctx.fill();
+ ctx.shadowBlur=0;
+
+ for(const cl of clouds){
+   ctx.fillStyle='#ffffff12';
+   ctx.beginPath();
+   ctx.arc(cl.x,cl.y,35*cl.s,0,Math.PI*2);
+   ctx.arc(cl.x+45*cl.s,cl.y-13*cl.s,44*cl.s,0,Math.PI*2);
+   ctx.arc(cl.x+90*cl.s,cl.y,35*cl.s,0,Math.PI*2);
+   ctx.fill();
+ }
+ ctx.restore();
+}
+
+function world(){
+ ctx.save();
+
+ let sx=0;
+ if(shake>0)sx=(Math.random()-.5)*shake;
+ ctx.translate(-camera+sx,0);
+
+ /* mountains */
+ ctx.fillStyle='#0c0c2b';
+ for(let x=-100;x<WORLD+300;x+=330){
+   ctx.beginPath();
+   ctx.moveTo(x,560);
+   ctx.lineTo(x+150,350);
+   ctx.lineTo(x+330,560);
+   ctx.fill();
+ }
+
+ /* platforms */
+ for(const q of platforms){
+   ctx.shadowBlur=18;
+   ctx.shadowColor='#39e7ff55';
+   ctx.fillStyle='#171733';
+   ctx.fillRect(q.x,q.y,q.w,q.h);
+   ctx.shadowBlur=0;
+   ctx.fillStyle='#39e7ff';
+   ctx.fillRect(q.x,q.y,q.w,4);
+   ctx.fillStyle='#ffffff09';
+   ctx.fillRect(q.x+8,q.y+13,q.w-16,2);
+ }
+
+ /* collectibles */
+ for(const i of items){
+   if(i.got)continue;
+
+   const yy=i.y+Math.sin(Date.now()/250+i.bob)*5;
+
+   ctx.save();
+   ctx.translate(i.x,yy);
+   ctx.textAlign='center';
+   ctx.textBaseline='middle';
+
+   if(i.type==='heart'){
+     ctx.shadowBlur=28;
+     ctx.shadowColor='#ff2f92';
+     ctx.fillStyle='#ff4f9a';
+     ctx.font='44px Arial';
+     ctx.fillText('♥',0,0);
+
+     ctx.shadowBlur=0;
+     ctx.fillStyle='#fff';
+     ctx.font='bold 10px Outfit';
+     ctx.fillText('+HEART',0,31);
+   }else{
+     ctx.shadowBlur=25;
+     ctx.shadowColor='#ffe45c';
+     ctx.fillStyle='#ffe45c';
+     ctx.font='36px Arial';
+     ctx.fillText('★',0,0);
+   }
+   ctx.restore();
+ }
+
+ /* enemies */
+ for(const e of enemies){
+   ctx.shadowBlur=16;
+   ctx.shadowColor='#9b6cff';
+   ctx.fillStyle='#7956e8';
+   ctx.beginPath();
+   ctx.roundRect(e.x,e.y,e.w,e.h,13);
+   ctx.fill();
+   ctx.shadowBlur=0;
+   ctx.fillStyle='#fff';
+   ctx.fillRect(e.x+7,e.y+10,9,10);
+   ctx.fillRect(e.x+24,e.y+10,9,10);
+   ctx.fillStyle='#151528';
+   ctx.fillRect(e.x+10,e.y+13,4,5);
+   ctx.fillRect(e.x+27,e.y+13,4,5);
+ }
+
+ /* finish */
+ const fx=WORLD-150;
+ ctx.fillStyle='#aaa';
+ ctx.fillRect(fx,280,5,250);
+
+ ctx.shadowBlur=18;
+ ctx.shadowColor='#ff4f9a';
+ ctx.fillStyle='#ff4f9a';
+ ctx.beginPath();
+ ctx.moveTo(fx+5,285);
+ ctx.lineTo(fx+105,315);
+ ctx.lineTo(fx+5,345);
+ ctx.fill();
+ ctx.shadowBlur=0;
+
+ ctx.fillStyle='#fff';
+ ctx.font='800 16px Outfit';
+ ctx.fillText('FINISH',fx+23,319);
+
+ /* player */
+ if(photoReady){
+   ctx.save();
+   ctx.shadowBlur=28;
+   ctx.shadowColor='#ff4f9aaa';
+   ctx.beginPath();
+   ctx.roundRect(p.x,p.y,p.w,p.h,18);
+   ctx.clip();
+   ctx.drawImage(photo,p.x,p.y,p.w,p.h);
+   ctx.restore();
+
+   ctx.strokeStyle='#fff';
+   ctx.lineWidth=3;
+   ctx.beginPath();
+   ctx.roundRect(p.x,p.y,p.w,p.h,18);
+   ctx.stroke();
+ }else{
+   ctx.shadowBlur=25;
+   ctx.shadowColor='#ff4f9a';
+   ctx.fillStyle='#ff4f9a';
+   ctx.beginPath();
+   ctx.roundRect(p.x,p.y,p.w,p.h,18);
+   ctx.fill();
+   ctx.shadowBlur=0;
+
+   ctx.fillStyle='#fff';
+   ctx.font='bold 10px Outfit';
+   ctx.textAlign='center';
+   ctx.fillText('PILIH FOTO',p.x+p.w/2,p.y+p.h/2);
+ }
+
+ ctx.fillStyle='#fff';
+ ctx.font='800 12px Outfit';
+ ctx.textAlign='center';
+ ctx.fillText('TIA',p.x+p.w/2,p.y-8);
+
+ drawParticles();
+
+ ctx.restore();
+}
+
+function loop(){
+ update();
+ background();
+ world();
+ requestAnimationFrame(loop);
+}
+loop();
+
+
+/* =========================================================
+   ORIGINAL ROMANTIC MUSIC — Web Audio API
+   Tidak membutuhkan file MP3 eksternal.
+   Klik MUSIC untuk mulai/berhenti.
+   ========================================================= */
+let audioCtx=null, musicTimer=null, musicOn=false, step=0;
+let masterGain=null;
+
+const melody=[
+  261.63,329.63,392.00,329.63,
+  293.66,349.23,440.00,349.23,
+  261.63,329.63,392.00,523.25,
+  440.00,392.00,329.63,293.66
+];
+const bass=[
+  130.81,130.81,146.83,146.83,
+  130.81,130.81,110.00,110.00
+];
+
+function tone(freq,start,duration,type='sine',volume=.035){
+  if(!audioCtx || !masterGain)return;
+  const osc=audioCtx.createOscillator();
+  const gain=audioCtx.createGain();
+  osc.type=type;
+  osc.frequency.setValueAtTime(freq,start);
+
+  gain.gain.setValueAtTime(0.0001,start);
+  gain.gain.exponentialRampToValueAtTime(volume,start+.025);
+  gain.gain.exponentialRampToValueAtTime(0.0001,start+duration);
+
+  osc.connect(gain);
+  gain.connect(masterGain);
+  osc.start(start);
+  osc.stop(start+duration+.05);
+}
+
+function startMusic(){
+  if(musicOn)return;
+
+  audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+  masterGain=audioCtx.createGain();
+  masterGain.gain.value=.55;
+  masterGain.connect(audioCtx.destination);
+
+  musicOn=true;
+  document.getElementById('musicBtn').textContent='🎵 MUSIC ON';
+  document.getElementById('musicBtn').classList.add('on');
+
+  step=0;
+  playMusicLoop();
+}
+
+function playMusicLoop(){
+  if(!musicOn)return;
+
+  const now=audioCtx.currentTime+.05;
+  const beat=.42;
+
+  for(let i=0;i<16;i++){
+    const t=now+i*beat;
+    tone(melody[(step+i)%melody.length],t,beat*.82,'triangle',.045);
+    if(i%2===0){
+      tone(bass[(Math.floor((step+i)/2))%bass.length],t,beat*1.7,'sine',.028);
+    }
+  }
+
+  // Soft high note every 4 beats for a dreamy feel.
+  tone(659.25,now+beat*3.5,beat*1.5,'sine',.018);
+
+  step=(step+16)%melody.length;
+  musicTimer=setTimeout(playMusicLoop,beat*16*1000-80);
+}
+
+function stopMusic(){
+  musicOn=false;
+  if(musicTimer)clearTimeout(musicTimer);
+  musicTimer=null;
+
+  if(masterGain){
+    const now=audioCtx.currentTime;
+    masterGain.gain.cancelScheduledValues(now);
+    masterGain.gain.setValueAtTime(masterGain.gain.value,now);
+    masterGain.gain.exponentialRampToValueAtTime(.0001,now+.35);
+  }
+
+  document.getElementById('musicBtn').textContent='🎵 MUSIC OFF';
+  document.getElementById('musicBtn').classList.remove('on');
+}
+
+document.getElementById('musicBtn').addEventListener('click',()=>{
+  if(musicOn) stopMusic();
+  else startMusic();
+});
+
+/* Controls */
+function bind(id,k){
+ const b=document.getElementById(id);
+
+ b.addEventListener('pointerdown',e=>{
+   e.preventDefault();
+   keys[k]=true;
+ });
+
+ ['pointerup','pointercancel','pointerleave'].forEach(type=>{
+   b.addEventListener(type,e=>{
+     e.preventDefault();
+     keys[k]=false;
+   });
+ });
+}
+
+bind('left','l');
+bind('right','r');
+
+document.getElementById('jump').addEventListener('pointerdown',e=>{
+ e.preventDefault();
+ keys.j=true;
+});
+
+addEventListener('keydown',e=>{
+ if(['ArrowLeft','a','A'].includes(e.key))keys.l=true;
+ if(['ArrowRight','d','D'].includes(e.key))keys.r=true;
+ if([' ','ArrowUp','w','W'].includes(e.key)){
+   e.preventDefault();
+   keys.j=true;
+ }
+});
+
+addEventListener('keyup',e=>{
+ if(['ArrowLeft','a','A'].includes(e.key))keys.l=false;
+ if(['ArrowRight','d','D'].includes(e.key))keys.r=false;
+});
+
+/* Tombol pilih foto saat klik karakter */
+canvas.addEventListener('click',e=>{
+ if(!photoReady){
+   choosePhoto();
+ }
+});
+
+document.getElementById('again').onclick=reset;
+</script>
+</body>
+</html>
